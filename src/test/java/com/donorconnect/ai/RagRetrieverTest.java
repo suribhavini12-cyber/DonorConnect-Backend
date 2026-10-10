@@ -31,7 +31,7 @@ class RagRetrieverTest {
                 "donation-process",
                 "Donation Process",
                 "Donation Basics",
-                "Blood donation typically takes 45-60 minutes.",
+                "The general blood donation process consists of registration, health history and mini-physical, donation, and refreshments and recovery. Donors check in, complete a health screening, donate blood, and rest afterward.",
                 "DonorConnect Knowledge Base");
 
         safetyChunk = new RagChunk(
@@ -93,4 +93,15 @@ class RagRetrieverTest {
         assertThat(results)
                 .anyMatch(chunk -> chunk.getChunkId().equals("donation-1"));
     }
+
+    @Test
+    @DisplayName("Retrieves donation process for a question about starting donation")
+    void retrieveTopChunks_HowToStartDonating() {
+        List<RagChunk> results = retriever.retrieveTopChunks(
+                "What should I do if I want to donate blood?", 4);
+
+        assertThat(results)
+                .anyMatch(chunk -> chunk.getChunkId().equals("donation-1"));
+    }
+
 }

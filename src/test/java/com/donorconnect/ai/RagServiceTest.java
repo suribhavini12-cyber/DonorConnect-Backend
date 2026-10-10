@@ -64,7 +64,6 @@ class RagServiceTest {
     @DisplayName("Relevant question retrieves context and returns fallback when key missing")
     void processChat_RelevantQuestion() {
         when(retriever.retrieveTopChunks("How long does donation take?", 4)).thenReturn(List.of(mockChunk));
-        when(geminiAiService.isApiKeyConfigured()).thenReturn(false);
 
         ChatResponse response = ragService.processChat("How long does donation take?");
 

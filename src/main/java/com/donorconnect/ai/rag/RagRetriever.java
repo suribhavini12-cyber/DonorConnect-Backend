@@ -2,11 +2,14 @@
 package com.donorconnect.ai.rag;
 
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 @Component
 public class RagRetriever {
+    private static final Logger logger = LoggerFactory.getLogger(RagRetriever.class);
 
     private static final Set<String> STOP_WORDS = new HashSet<>(Arrays.asList(
             "a", "an", "and", "are", "as", "at", "be", "by", "for",
@@ -38,6 +41,9 @@ public class RagRetriever {
 
         for (RagChunk chunk : knowledgeBase.getChunks()) {
             double score = calculateScore(queryTokens, chunk);
+            if (score > 0) {
+                logger.debug("RAG score: {} | Title: {}", score, chunk.getTitle());
+            }
 
             if (score > 0.0) {
                 scoredChunks.add(new ScoredChunk(chunk, score));
@@ -45,6 +51,14 @@ public class RagRetriever {
         }
 
         scoredChunks.sort((a, b) -> Double.compare(b.score, a.score));
+        scoredChunks.stream()
+                .limit(10)
+                .forEach(s -> logger.debug(
+                        "TOP RAG CHUNK | Score: {} | Title: {} | Content: {}",
+                        s.score,
+                        s.chunk.getTitle(),
+                        s.chunk.getContent().substring(
+                                0, Math.min(150, s.chunk.getContent().length()))));
 
         double minThreshold = 3.0;
         List<RagChunk> result = new ArrayList<>();
@@ -77,18 +91,18 @@ public class RagRetriever {
         int matchedTokens = 0;
 
         for (String token : queryTokens) {
-            boolean matched = false;
             String regex = "\\b" + java.util.regex.Pattern.quote(token) + "\\b";
+            boolean matched = false;
 
             if (java.util.regex.Pattern.compile(regex)
                     .matcher(contentLower).find()) {
-                totalScore += 2.0;
+                totalScore += 1.0;
                 matched = true;
             }
 
             if (java.util.regex.Pattern.compile(regex)
                     .matcher(titleLower).find()) {
-                totalScore += 4.0;
+                totalScore += 5.0;
                 matched = true;
             }
 
@@ -105,6 +119,16 @@ public class RagRetriever {
 
         if (matchedTokens > 1) {
             totalScore *= (1.0 + 0.3 * (matchedTokens - 1));
+        }
+        // Boost the donation-process chunk only for questions about starting donation.
+        String queryText = String.join(" ", queryTokens);
+
+        if ((queryText.contains("want")
+                || queryText.contains("start")
+                || queryText.contains("should"))
+                && queryText.contains("donat")
+                && titleLower.contains("donation process")) {
+            totalScore += 8.0;
         }
 
         return totalScore;
