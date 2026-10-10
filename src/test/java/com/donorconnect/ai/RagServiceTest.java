@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class RagServiceTest {
@@ -36,7 +38,8 @@ class RagServiceTest {
 
     @BeforeEach
     void setUp() {
-        mockChunk = new RagChunk("c1", "doc1", "General Process", "Basics", "Donation takes 45-60 mins.", "DonorConnect Knowledge Base");
+        mockChunk = new RagChunk("c1", "doc1", "General Process", "Basics", "Donation takes 45-60 mins.",
+                "DonorConnect Knowledge Base");
     }
 
     @Test
@@ -49,7 +52,8 @@ class RagServiceTest {
     @Test
     @DisplayName("Emergency question returns immediate medical safety warning")
     void processChat_EmergencyQuestion() {
-        ChatResponse response = ragService.processChat("I am having severe chest pain and heavy bleeding after donation!");
+        ChatResponse response = ragService
+                .processChat("I am having severe chest pain and heavy bleeding after donation!");
 
         assertThat(response.getAnswer()).contains("EMERGENCY SAFETY NOTICE");
         assertThat(response.getAnswer()).contains("108");
@@ -79,5 +83,39 @@ class RagServiceTest {
 
         assertThat(response.getAnswer()).contains("do not contain enough information");
         assertThat(response.getSources()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Successful Gemini response returns AI answer")
+    void processChat_GeminiSuccess() {
+        when(retriever.retrieveTopChunks("How long does donation take?", 4))
+                .thenReturn(List.of(mockChunk));
+        when(geminiAiService.isApiKeyConfigured()).thenReturn(true);
+        when(geminiAiService.callGemini(anyString()))
+                .thenReturn("Blood donation typically takes 45-60 minutes.");
+
+        ChatResponse response = ragService.processChat("How long does donation take?");
+
+        assertThat(response.getSourceType()).isEqualTo("AI");
+        assertThat(response.getAnswer())
+                .isEqualTo("Blood donation typically takes 45-60 minutes.");
+        assertThat(response.getSources()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Gemini failure returns knowledge-base fallback")
+    void processChat_GeminiFailure() {
+        when(retriever.retrieveTopChunks("How long does donation take?", 4))
+                .thenReturn(List.of(mockChunk));
+        when(geminiAiService.isApiKeyConfigured()).thenReturn(true);
+        when(geminiAiService.callGemini(anyString()))
+                .thenThrow(new RuntimeException("Simulated Gemini failure"));
+
+        ChatResponse response = ragService.processChat("How long does donation take?");
+
+        assertThat(response.getSourceType()).isEqualTo("FALLBACK");
+        assertThat(response.getAnswer())
+                .contains("Donation takes 45-60 mins.");
+        assertThat(response.getSources()).hasSize(1);
     }
 }
