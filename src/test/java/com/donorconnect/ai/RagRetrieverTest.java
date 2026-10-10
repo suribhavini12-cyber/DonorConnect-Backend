@@ -83,4 +83,14 @@ class RagRetrieverTest {
     void retrieveTopChunks_BlankQuestion() {
         assertThat(retriever.retrieveTopChunks("   ", 4)).isEmpty();
     }
+
+    @Test
+    @DisplayName("Matches donating questions with donation content")
+    void retrieveTopChunks_DonatingMatchesDonation() {
+        List<RagChunk> results = retriever.retrieveTopChunks(
+                "What happens when donating blood?", 4);
+
+        assertThat(results)
+                .anyMatch(chunk -> chunk.getChunkId().equals("donation-1"));
+    }
 }
